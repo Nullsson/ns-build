@@ -36,6 +36,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../MJSON/mjson.h"
+
 #define TP_LINK_PORT 9999
 #define MAX_SOCKS 1024
 #define STATUS_NONE 1

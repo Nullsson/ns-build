@@ -41,6 +41,21 @@
 #define STATUS_NONE 1
 #define STATUS_CONNECTING 2
 
+enum tp_link_type
+{
+    TP_LINK_TYPE_UNKNOWN,
+    TP_LINK_TYPE_PLUG,
+    TP_LINK_TYPE_LAMP,
+    TP_LINK_TYPE_MAX,
+};
+
+struct tp_link_device
+{
+    char *IP;
+    uint16_t Port;
+    enum tp_link_type Type;
+};
+
 // TODO(Oskar): Functions & structures library naming in order to not clash for users.
 
 struct connection {
@@ -54,6 +69,52 @@ struct connection Connections[MAX_SOCKS];
 unsigned int Timeout = 5;
 unsigned int SocketNumber = 256;
 unsigned long Found = 0;
+
+struct in_addr FoundAddresses[255] = {0};
+
+// TODO(Oskar): This is for the user to make something of. Remove later.
+struct tp_link_device TPLinkDevices[10] = {0};
+
+// NOTE(Oskar): Has to be length 4 buffer.
+// TODO(Oskar): Add validation.
+void serializeUint32(char *buf, uint32_t val)
+{
+    buf[0] = (val >> 24) & 0xff;
+    buf[1] = (val >> 16) & 0xff;
+    buf[2] = (val >> 8) & 0xff;
+    buf[3] = val & 0xff;
+}
+
+void decrypt(char *input, uint16_t length)
+{
+    uint8_t key = 171;
+    uint8_t next_key;
+    for (uint16_t i = 0; i < length; i++)
+    {
+        next_key = input[i];
+        input[i] = key ^ input[i];
+        key = next_key;
+    }
+}
+
+void encrypt(char *data, uint16_t length)
+{
+    uint8_t key = 171;
+    for (uint16_t i = 0; i < length + 1; i++)
+    {
+        data[i] = key ^ data[i];
+        key = data[i];
+    }
+}
+
+void encryptWithHeader(char *out, char *data, uint16_t length)
+{
+    char serialized[4];
+    serializeUint32(serialized, length);
+    encrypt(data, length);
+    memcpy(out, &serialized, 4);
+    memcpy(out + 4, data, length);
+}
 
 // clean connection structure
 void CleanConnection(struct connection *Connection) {
@@ -115,7 +176,8 @@ void VerifyConnection(struct connection *Connection) {
         // TODO(Oskar): Store Found addresses somewhere in order to ping them later.
         printf("Open %s:%u    \n", inet_ntoa(Connection->ConnectionAddress.sin_addr),
             ntohs(Connection->ConnectionAddress.sin_port));
-        Found++;
+        FoundAddresses[Found++] = Connection->ConnectionAddress.sin_addr;
+        // Found++;
         CleanConnection(&(*Connection));
     }
 
@@ -129,6 +191,85 @@ void _Cleanup(int none) {
         CleanConnection(&Connections[x]);
     }
     puts("Done.\n");
+}
+
+uint16_t sockConnect(char *out, const char *ip_add, int port, const char *cmd, uint16_t length)
+{
+
+    // struct sockaddr_in address;
+    int sock = 0, valread;
+    struct sockaddr_in serv_addr;
+    char buf[2048] = {0};
+    //  char buffer[2048] = {0};
+    //    char buffer[2048] = {0};
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        printf("\n Socket creation error \n");
+        return 0;
+    }
+
+    memset(&serv_addr, '0', sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    // Convert IPv4 and IPv6 addresses from text to binary form
+    if (inet_pton(AF_INET, ip_add, &serv_addr.sin_addr) <= 0)
+    {
+        printf("\nInvalid address/ Address not supported \n");
+        return 0;
+    }
+
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("\nConnection Failed \n");
+        return 0;
+    }
+    send(sock, cmd, length, 0);
+
+    valread = read(sock, buf, 2048);
+    close(sock);
+
+    if (valread == 0)
+    {
+        printf("\nNo bytes read\n");
+    }
+    else
+    {
+        // buf + 4 strips 4 byte header
+        // valread - 3 leaves 1 byte for terminating null character
+        strncpy(out, buf + 4, valread - 3);
+    }
+
+    return valread;
+}
+
+void SendTPLinkCommand(const char *Command, char *IP, uint16_t Port, char *Response)
+{
+    uint16_t cmdLen = strlen(Command);
+
+    // Encrypt outgoing message.. Can be moved outside of this loop later on.
+    char encrypted[cmdLen + 4];
+    char cmdCpy[cmdLen];
+    sprintf(cmdCpy, "%s", Command);
+    encryptWithHeader(encrypted, cmdCpy, cmdLen);
+    // char response[2048] = {0};
+    uint16_t length = sockConnect(Response, IP, Port, encrypted, cmdLen + 4);
+    if (length > 0)
+        decrypt(Response, length - 4);
+    else
+        return;
+    
+    return;
+}
+
+void CheckTPLinkDeviceInfo(char *IP, uint16_t Port)
+{
+    const char *cmd = "{\"system\":{\"get_sysinfo\":{}}}";
+    char Result[2048] = {0};
+    SendTPLinkCommand(cmd, IP, Port, Result);
+
+    printf("Response from server: %s\n", Result);
 }
 
 int main(int argc, char *argv[]) {
@@ -193,5 +334,13 @@ int main(int argc, char *argv[]) {
     _Cleanup(0);
 
     printf("Open %lu [Done]\n", Found);
+
+    printf("The found ones are: \n");
+    for (int Index = 0; Index < Found; ++Index)
+    {
+        printf("Open %s:9999    \n", inet_ntoa(FoundAddresses[Index]));
+        CheckTPLinkDeviceInfo(inet_ntoa(FoundAddresses[Index]), 9999);
+    }
+
     return 0;
 }

@@ -53,6 +53,7 @@ enum tp_link_type
 
 struct tp_link_device
 {
+    char *Name;
     char *IP;
     uint16_t Port;
     enum tp_link_type Type;
@@ -76,6 +77,7 @@ struct in_addr FoundAddresses[255] = {0};
 
 // TODO(Oskar): This is for the user to make something of. Remove later.
 struct tp_link_device TPLinkDevices[10] = {0};
+int NumberOfTpLinkDevices = 0;
 
 // NOTE(Oskar): Has to be length 4 buffer.
 // TODO(Oskar): Add validation.
@@ -270,6 +272,44 @@ void CheckTPLinkDeviceInfo(char *IP, uint16_t Port)
     const char *cmd = "{\"system\":{\"get_sysinfo\":{}}}";
     char Result[2048] = {0};
     SendTPLinkCommand(cmd, IP, Port, Result);
+
+    mjson_parser Parser;
+    mjson_token Tokens[128];
+
+    mjson_init(&Parser);
+    int MJSONResult = mjson_parse(&Parser, Result, strlen(Result), Tokens, 128);
+
+    if (MJSONResult > 0)
+    {
+        char Name[256];
+        char Type[256];
+        mjson_token Alias = Tokens[mjson_get_value("alias", Result, Tokens, 128)];
+        mjson_token DevName = Tokens[mjson_get_value("dev_name", Result, Tokens, 128)];
+
+        strncpy(Name, Result + Alias.Start, Alias.End - Alias.Start);
+        printf("Device found: %s\n", Name);
+
+        strncpy(Type, Result + DevName.Start, DevName.End - DevName.Start);
+        printf("Device type: %s\n", Type);
+
+        struct tp_link_device Device = TPLinkDevices[NumberOfTpLinkDevices++];
+        Device.Port = Port;
+        Device.IP = IP;
+        printf("%s\n", Device.IP);
+
+        Device.Name = (char *) malloc(strlen(Name)+1 * sizeof(char));
+        strncpy(Device.Name, Name, 256);
+        printf("%s\n", Device.Name);
+
+        if (strstr(Type, "Plug") != NULL)
+        {
+            Device.Type = TP_LINK_TYPE_PLUG;
+            printf("Device type is plug\n");
+        }
+
+        // TODO(Oskar): Here the tp_link_device has been populated with information and should be ready for use.
+        //              clean up code and add helper functions for controlling the device.
+    }
 
     printf("Response from server: %s\n", Result);
 }

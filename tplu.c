@@ -76,7 +76,7 @@ unsigned long Found = 0;
 struct in_addr FoundAddresses[255] = {0};
 
 // TODO(Oskar): This is for the user to make something of. Remove later.
-struct tp_link_device TPLinkDevices[10] = {0};
+static struct tp_link_device TPLinkDevices[10] = {0};
 int NumberOfTpLinkDevices = 0;
 
 // NOTE(Oskar): Has to be length 4 buffer.
@@ -287,26 +287,25 @@ void CheckTPLinkDeviceInfo(char *IP, uint16_t Port)
         mjson_token DevName = Tokens[mjson_get_value("dev_name", Result, Tokens, 128)];
 
         strncpy(Name, Result + Alias.Start, Alias.End - Alias.Start);
-        printf("Device found: %s\n", Name);
-
         strncpy(Type, Result + DevName.Start, DevName.End - DevName.Start);
-        printf("Device type: %s\n", Type);
 
-        struct tp_link_device Device = TPLinkDevices[NumberOfTpLinkDevices++];
-        Device.Port = Port;
-        Device.IP = IP;
-        printf("%s\n", Device.IP);
+        struct tp_link_device *Device = &TPLinkDevices[NumberOfTpLinkDevices];
+        NumberOfTpLinkDevices++;
+        
+        Device->Port = Port;
 
-        Device.Name = (char *) malloc(strlen(Name)+1 * sizeof(char));
-        strncpy(Device.Name, Name, 256);
-        printf("%s\n", Device.Name);
+        // TODO(Oskar): Does strcpy really need string to be malloc'd + 1 ?
+        Device->Name = (char *) malloc((strlen(Name) + 1) * sizeof(char));
+        strcpy(Device->Name, Name);
+        
+        Device->IP = (char *) malloc((strlen(IP) + 1) * sizeof(char));
+        strcpy(Device->IP, IP);
 
         if (strstr(Type, "Plug") != NULL)
         {
-            Device.Type = TP_LINK_TYPE_PLUG;
-            printf("Device type is plug\n");
+            Device->Type = TP_LINK_TYPE_PLUG;
         }
-
+        
         // TODO(Oskar): Here the tp_link_device has been populated with information and should be ready for use.
         //              clean up code and add helper functions for controlling the device.
     }
@@ -382,6 +381,18 @@ int main(int argc, char *argv[]) {
     {
         printf("Open %s:9999    \n", inet_ntoa(FoundAddresses[Index]));
         CheckTPLinkDeviceInfo(inet_ntoa(FoundAddresses[Index]), 9999);
+
+        printf("Number found: %d\n", NumberOfTpLinkDevices);
+        for (int T = 0; T < NumberOfTpLinkDevices; ++T)
+        {
+            struct tp_link_device *Device = &TPLinkDevices[T];
+            printf("%s\n", Device->Name);
+            printf("%d\n", Device->Port);
+            if (Device->Type == TP_LINK_TYPE_PLUG)
+            {
+                printf("Device type is plug\n");
+            }
+        }
     }
 
     return 0;

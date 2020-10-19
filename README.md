@@ -1,3 +1,2 @@
-# TP-LINK-Unchained
-
-A small utility tool used to scan for office lights and plugs. This repository will soon be recycled.
+# ns-build
+An in-house build tool used for projects at Nullsson.

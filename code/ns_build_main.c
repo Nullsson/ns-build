@@ -1,23 +1,33 @@
+/* ========================================================================
+   $File: $
+   $Date: $
+   $Revision: $
+   $Creator: Oskar Mendel $
+   $Notice: (C) Copyright 2020 by Nullsson, Inc. All Rights Reserved. $
+   ======================================================================== */
+
 #if BUILD_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #elif BUILD_LINUX
 #endif
 
+// NOTE(Oskar): CRT
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
-// TODO(Oskar): Create ns_build.h file with function definitions to be used by a dll
-// TODO(Oskar): Create an example_ns_config.c that uses ns_build.h and compile it using the clang process.
+// NOTE(Oskar): NSBuild
+#include "ns_build.h"
+
+// TODO(Oskar): Create an ns_template.c that uses ns_build.h and compile it using the clang process.
 // TODO(Oskar): Run example_ns_config.exe using CreateProcess to build the project. 
+// TODO(Oskar): Add helper functions to ns_build.h if needed.
 
-int main(int argc, char **args)
+void
+Build()
 {
-    printf("Hello World!\n");
-    
-#if META_BUILD
-    printf("This was successfully built using NS-Build!\n");
-#endif
-
+    // TODO(Oskar): Clean up!
 #if BUILD_WIN32
     STARTUPINFO Info;
     PROCESS_INFORMATION ProcessInformation;
@@ -29,7 +39,7 @@ int main(int argc, char **args)
     // TODO(Oskar): Build compilation string dynamically and change theese values later on.
     // TODO(Oskar): Document arguments for self learning purposes.
     if (CreateProcess(NULL,
-                      "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -DBUILD_WIN32=1 -DBUILD_LINUX=0 -DMETA_BUILD=1 ../code/ns_build_main.c /link /out:ns_meta.exe",
+                      "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ../code/ ../code/ns_template.c /LD /link /out:nsb.dll",
                       NULL,
                       NULL,
                       FALSE,
@@ -49,6 +59,21 @@ int main(int argc, char **args)
 
     printf("Exiting safe and sound!\n");
 #endif
+}
+
+// TODO(Oskar): Implement!
+void Run()
+{
+    
+}
+
+int
+main(int argc, char **args)
+{
+    printf("Hello World!\n");
+
+    Build();
+    Run();
     
     return 0;
 }

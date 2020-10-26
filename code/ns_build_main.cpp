@@ -19,6 +19,7 @@
 
 // NOTE(Oskar): NSBuild
 #include "ns_build.h"
+#include "ns_build_dynamic.cpp"
 
 // TODO(Oskar): Create an ns_template.c that uses ns_build.h and compile it using the clang process.
 // TODO(Oskar): Run example_ns_config.exe using CreateProcess to build the project. 
@@ -39,7 +40,7 @@ Build()
     // TODO(Oskar): Build compilation string dynamically and change theese values later on.
     // TODO(Oskar): Document arguments for self learning purposes.
     if (CreateProcess(NULL,
-                      "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ../code/ ../code/ns_template.c /LD /link /out:nsb.dll",
+                      "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ../code/ ../code/ns_template.cpp /LD /link /out:nsb.dll",
                       NULL,
                       NULL,
                       FALSE,
@@ -75,5 +76,5 @@ main(int argc, char **args)
     Build();
     Run();
     
-    return 0;
+    return (0);
 }

@@ -1,1 +1,1 @@
-call "../../build/ns_build.exe"
+call "../../build/ns_build.exe" -v

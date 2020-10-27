@@ -21,7 +21,6 @@ NSBuildParseConfig(char *FileContents, NSBuildConfig *Config)
     char *CurrentLine = FileContents;
     while(CurrentLine)
     {
-        // TODO(Oskar): Process CurrentLine
         char *NextLine = strchr(CurrentLine, '\n');
         if (NextLine)
         {
@@ -29,7 +28,6 @@ NSBuildParseConfig(char *FileContents, NSBuildConfig *Config)
             *NextLine = '\0';
         }
 
-        //printf("CurrentLine: %s\n", CurrentLine);
         if (*CurrentLine != '#')
         {
             char *Key = CurrentLine;
@@ -63,7 +61,7 @@ NSBuildParseConfig(char *FileContents, NSBuildConfig *Config)
             }
             else
             {
-                // TODO(Oskar): Log unknown config.
+                LogError("ERROR: Found unrecognized Key in config file: %s", Key);
                 free(ValueCopy);
             }
             

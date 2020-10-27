@@ -27,7 +27,7 @@ NSBuildDynamicCodeLoad(char *DLLPath)
     DynamicCode.DLLHandle = LoadLibraryA(DLLPath);
     if(DynamicCode.DLLHandle)
     {
-        // TODO(Oskar): Implement Log function.
+        Log("Dynamic code successfully loaded from: %s", DLLPath);
         DynamicCode.InitCallback    = (NSBuildInitCallback *)GetProcAddress(DynamicCode.DLLHandle, "NSBuildCustomInitCallback");
         DynamicCode.CleanUpCallback = (NSBuildCleanUpCallback *)GetProcAddress(DynamicCode.DLLHandle, "NSBuildCustomCleanUpCallback");
     }
@@ -36,7 +36,7 @@ NSBuildDynamicCodeLoad(char *DLLPath)
 
     if(!DynamicCode.InitCallback && !DynamicCode.CleanUpCallback)
     {
-        // TODO(Oskar): Logging.
+        LogError("ERROR: No callbacks was successfully loaded.");
     }
     
     return (DynamicCode);

@@ -38,14 +38,14 @@ Build(char *CodePath)
     ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
 
     // TODO(Oskar): Build compilation string dynamically and change theese values later on.
-    // TODO(Oskar): Document arguments for self learning purposes.
-    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ";
-    strcat(BuildCommand, CodePath);
+    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi ";
+    //strcat(BuildCommand, CodePath);
     strcat(BuildCommand, " ");
     strcat(BuildCommand, CodePath);
-    strcat(BuildCommand, "/nsb.cpp ");
+    strcat(BuildCommand, "/nsb.cpp "); // TODO(Oskar): This should later be read from the config.
     strcat(BuildCommand, "/LD /link /out:nsb.dll");
-    
+
+    // TODO(Oskar): Document arguments for self learning purposes.
     if (CreateProcess(NULL,
                       BuildCommand,
                       NULL,
@@ -131,7 +131,6 @@ main(int argc, char **args)
     if (Size)
     {
         // TODO(Oskar): Name of this file should be gotten from the config.
-        strcat(DynamicCodePath, "/code"); 
         printf("%s\n", DynamicCodePath);
         Build(DynamicCodePath);
     }

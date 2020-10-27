@@ -6,7 +6,7 @@
    $Notice: (C) Copyright 2020 by Nullsson, Inc. All Rights Reserved. $
    ======================================================================== */
 
-#include "ns_build.h"
+#include "../../code/ns_build.h"
 #include <stdio.h>
 
 NSBUILD_FUNC void

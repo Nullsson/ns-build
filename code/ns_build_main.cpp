@@ -21,12 +21,12 @@
 #include "ns_build.h"
 #include "ns_build_dynamic.cpp"
 
-// TODO(Oskar): Create an ns_template.c that uses ns_build.h and compile it using the clang process.
-// TODO(Oskar): Run example_ns_config.exe using CreateProcess to build the project. 
 // TODO(Oskar): Add helper functions to ns_build.h if needed.
 
+static int UseLogging = 0;
+
 void
-Build()
+Build(char *CodePath)
 {
     // TODO(Oskar): Clean up!
 #if BUILD_WIN32
@@ -39,8 +39,15 @@ Build()
 
     // TODO(Oskar): Build compilation string dynamically and change theese values later on.
     // TODO(Oskar): Document arguments for self learning purposes.
+    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ";
+    strcat(BuildCommand, CodePath);
+    strcat(BuildCommand, " ");
+    strcat(BuildCommand, CodePath);
+    strcat(BuildCommand, "/nsb.cpp ");
+    strcat(BuildCommand, "/LD /link /out:nsb.dll");
+    
     if (CreateProcess(NULL,
-                      "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ../code/ ../code/ns_template.cpp /LD /link /out:nsb.dll",
+                      BuildCommand,
                       NULL,
                       NULL,
                       FALSE,
@@ -68,12 +75,75 @@ void Run()
     
 }
 
+unsigned int
+StringsAreEqual(char *A, char *B)
+{
+    unsigned int Result = (A == B);
+    
+    if(A && B)
+    {
+        while(*A && *B && (*A == *B))
+        {
+            ++A;
+            ++B;
+        }
+        
+        Result = ((*A == 0) && (*B == 0));
+    }
+
+    return (Result);
+}
+
 int
 main(int argc, char **args)
 {
-    printf("Hello World!\n");
+    if (argc > 1)
+    {
+        if (StringsAreEqual(args[1], "help"))
+        {
+            // TODO(Oskar): Print help information.
+        }
+        else
+        {
+            for(int Index = 1; Index < argc; ++Index)
+            {
+                if (StringsAreEqual(args[Index], "-v") ||
+                    StringsAreEqual(args[Index], "--verbose"))
+                {
+                    UseLogging = 1;
+                }
+                // TODO(Oskar): Check for argument to create new config.
+            }
+        }
+    }
 
-    Build();
+    // TODO(Oskar): Read config file
+    {
+        char CurrentDirectory[MAX_PATH];
+        DWORD PathSize = GetCurrentDirectory(MAX_PATH, CurrentDirectory);
+
+        
+    }
+
+    
+    char DynamicCodePath[2048];
+    DWORD Size = GetCurrentDirectory(2048, DynamicCodePath);
+    if (Size)
+    {
+        // TODO(Oskar): Name of this file should be gotten from the config.
+        strcat(DynamicCodePath, "/code"); 
+        printf("%s\n", DynamicCodePath);
+        Build(DynamicCodePath);
+    }
+
+    // TODO(Oskar): Logging.
+    NSBuildDynamicCode DynamicCode = NSBuildDynamicCodeLoad("nsb.dll");
+    if (DynamicCode.InitCallback)
+    {
+        printf("Callback found, running code!\n");
+        DynamicCode.InitCallback();
+    }
+    
     Run();
     
     return (0);

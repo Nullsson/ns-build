@@ -1,0 +1,6 @@
+# Build Config for NS Build. Do not modify this file if you don't know what you're doing.
+DYNAMICCODEFILENAME=nsb.cpp
+ENTRYFILENAME=main.cpp
+COMPILERBACKEND=clang-cl
+COMPILERARGUMENTS=-nologo
+LINKERARGUMENTS=/link /out:main.exe

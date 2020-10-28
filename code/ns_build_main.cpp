@@ -16,19 +16,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 // NOTE(Oskar): NSBuild
 #include "ns_build.h"
+#include "ns_build_debug.cpp"
+#include "ns_build_util.cpp"
+#include "ns_build_config.cpp"
 #include "ns_build_dynamic.cpp"
-
-// TODO(Oskar): Add helper functions to ns_build.h if needed.
-
-static int UseLogging = 0;
 
 void
 Build(char *CodePath)
 {
-    // TODO(Oskar): Clean up!
 #if BUILD_WIN32
     STARTUPINFO Info;
     PROCESS_INFORMATION ProcessInformation;
@@ -37,25 +36,25 @@ Build(char *CodePath)
     Info.cb = sizeof(Info);
     ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
 
-    // TODO(Oskar): Build compilation string dynamically and change theese values later on.
-    // TODO(Oskar): Document arguments for self learning purposes.
-    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi -I ";
-    strcat(BuildCommand, CodePath);
+    // TODO(Oskar): Allow for custom build and link flags in config for the dynamic code.
+    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi";
     strcat(BuildCommand, " ");
     strcat(BuildCommand, CodePath);
-    strcat(BuildCommand, "/nsb.cpp ");
+    strcat(BuildCommand, " ");
     strcat(BuildCommand, "/LD /link /out:nsb.dll");
+
+    Log("Building DynamicCode with arguments: %s", BuildCommand);
     
-    if (CreateProcess(NULL,
-                      BuildCommand,
-                      NULL,
-                      NULL,
-                      FALSE,
-                      0,
-                      NULL,
-                      NULL,
-                      &Info,
-                      &ProcessInformation))
+    if (CreateProcess(NULL,                    // Application name, null so we will use command line.
+                      BuildCommand,            // Command line to be executed.
+                      NULL,                    // Process handle cannot be inherited.
+                      NULL,                    // Thread handle cannot be inherited.
+                      FALSE,                   // Set handle inheritance to false making it not inherited.
+                      0,                       // Creation flags, controls the priority class etc.
+                      NULL,                    // Pointer to environment block, use parent's environment block.
+                      NULL,                    // Full path to the current directory of the process, use parent's starting directory.
+                      &Info,                   // Pointer to STARTUPINFO structure.
+                      &ProcessInformation))    // Pointer to PROCESS_INFORMATION structure.
     {
         // TODO(Oskar): Maybe don't wait infinite time?
         WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
@@ -65,33 +64,16 @@ Build(char *CodePath)
         CloseHandle(ProcessInformation.hThread);
     }
 
-    printf("Exiting safe and sound!\n");
+    Log("DynamicCode successfully built!");
+#elif BUILD_LINUX
+    
 #endif
 }
 
 // TODO(Oskar): Implement!
-void Run()
+void PerformBuildStep()
 {
     
-}
-
-unsigned int
-StringsAreEqual(char *A, char *B)
-{
-    unsigned int Result = (A == B);
-    
-    if(A && B)
-    {
-        while(*A && *B && (*A == *B))
-        {
-            ++A;
-            ++B;
-        }
-        
-        Result = ((*A == 0) && (*B == 0));
-    }
-
-    return (Result);
 }
 
 int
@@ -99,9 +81,13 @@ main(int argc, char **args)
 {
     if (argc > 1)
     {
-        if (StringsAreEqual(args[1], "help"))
+        if (StringsAreEqual(args[1], "help") ||
+            StringsAreEqual(args[1], "-h") ||
+            StringsAreEqual(args[1], "--help"))
         {
-            // TODO(Oskar): Print help information.
+            printf("NS Build Flags:\n");
+            printf("--verbose    (-v)    Enable logging and more verbose messages.\n");
+            printf("--new        (-n)    Initiate new project.\n");
         }
         else
         {
@@ -112,31 +98,45 @@ main(int argc, char **args)
                 {
                     UseLogging = 1;
                 }
-                // TODO(Oskar): Check for argument to create new config.
+                else if (StringsAreEqual(args[Index], "-n") ||
+                         StringsAreEqual(args[Index], "--new") ||
+                         StringsAreEqual(args[Index], "init") ||
+                         StringsAreEqual(args[Index], "--init"))
+                {
+                    // TODO(Oskar): Create new config and template file.
+                }
             }
         }
     }
 
-    // TODO(Oskar): Read config file
+    NSBuildConfig Config = {0};
     {
         char CurrentDirectory[MAX_PATH];
         DWORD PathSize = GetCurrentDirectory(MAX_PATH, CurrentDirectory);
 
+        // TODO(Oskar): Dynamically find nsbconf file.
+        strcat(CurrentDirectory, "/buildconfig.nsbconf");
         
+        Config = NSBuildConfigLoad(CurrentDirectory);
+        Log("NS Build config found and loaded.");
+        printf("DynamicCodeFileName: %s\n", Config.DynamicCodeFileName);
+        printf("EntryFileName: %s\n", Config.EntryFileName);
+        printf("CompilerBackend: %s\n", Config.CompilerBackend);
+        printf("CompilerArguments: %s\n", Config.CompilerArguments);
+        printf("LinkerArguments: %s\n", Config.LinkerArguments);
     }
 
-    
     char DynamicCodePath[2048];
     DWORD Size = GetCurrentDirectory(2048, DynamicCodePath);
     if (Size)
     {
-        // TODO(Oskar): Name of this file should be gotten from the config.
-        strcat(DynamicCodePath, "/code"); 
-        printf("%s\n", DynamicCodePath);
-        Build(DynamicCodePath);
+        unsigned int FileNameSize = StringLength(Config.DynamicCodeFileName);
+        char Buffer[Size + FileNameSize + 1];
+        snprintf(Buffer, sizeof(Buffer), "%s\\%s", DynamicCodePath, Config.DynamicCodeFileName);
+
+        Build(Buffer);
     }
 
-    // TODO(Oskar): Logging.
     NSBuildDynamicCode DynamicCode = NSBuildDynamicCodeLoad("nsb.dll");
     if (DynamicCode.InitCallback)
     {
@@ -144,7 +144,9 @@ main(int argc, char **args)
         DynamicCode.InitCallback();
     }
     
-    Run();
+    PerformBuildStep();
+
+    NSBuildConfigUnload(&Config);
     
     return (0);
 }

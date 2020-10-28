@@ -6,18 +6,8 @@
    $Notice: (C) Copyright 2020 by Nullsson, Inc. All Rights Reserved. $
    ======================================================================== */
 
-#include "ns_build.h"
-#include <stdio.h>
-
-NSBUILD_FUNC void
-NSBuildCustomInitCallback(void)
-{
-    printf("This is a custom InitCallback function\n");
-    printf("This will be ran before the build.\n");
-}
-
-NSBUILD_FUNC void
-NSBuildCustomCleanUpCallback(void)
-{
-
-}
+static int UseLogging = 0;
+#define Log(...) if(UseLogging) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define LogError(...) fprintf(stderr, __VA_ARGS__); \
+    fprintf(stderr, "\n"); \
+    exit(0);

@@ -70,10 +70,47 @@ Build(char *CodePath)
 #endif
 }
 
-// TODO(Oskar): Implement!
-void PerformBuildStep()
+void PerformBuildStep(NSBuildConfig *Config)
 {
+#if BUILD_WIN32
+    STARTUPINFO Info;
+    PROCESS_INFORMATION ProcessInformation;
+
+    ZeroMemory(&Info, sizeof(Info));
+    Info.cb = sizeof(Info);
+    ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
+
+    char BuildCommand[2048];
+    snprintf(BuildCommand, sizeof(BuildCommand), "%s %s %s %s",
+             Config->CompilerBackend,
+             Config->CompilerArguments,
+             Config->EntryFileName,
+             Config->LinkerArguments);
+
+    Log("Building project with arguments: %s", BuildCommand);
     
+    if (CreateProcess(NULL,                    // Application name, null so we will use command line.
+                      BuildCommand,            // Command line to be executed.
+                      NULL,                    // Process handle cannot be inherited.
+                      NULL,                    // Thread handle cannot be inherited.
+                      FALSE,                   // Set handle inheritance to false making it not inherited.
+                      0,                       // Creation flags, controls the priority class etc.
+                      NULL,                    // Pointer to environment block, use parent's environment block.
+                      NULL,                    // Full path to the current directory of the process, use parent's starting directory.
+                      &Info,                   // Pointer to STARTUPINFO structure.
+                      &ProcessInformation))    // Pointer to PROCESS_INFORMATION structure.
+    {
+        // TODO(Oskar): Maybe don't wait infinite time?
+        WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
+
+        // NOTE(Oskar): Close the process when its done.
+        CloseHandle(ProcessInformation.hProcess);
+        CloseHandle(ProcessInformation.hThread);
+    }
+
+    Log("Successfully built application.");
+#elif BUILD_LINUX
+#endif
 }
 
 int
@@ -119,11 +156,6 @@ main(int argc, char **args)
         
         Config = NSBuildConfigLoad(CurrentDirectory);
         Log("NS Build config found and loaded.");
-        printf("DynamicCodeFileName: %s\n", Config.DynamicCodeFileName);
-        printf("EntryFileName: %s\n", Config.EntryFileName);
-        printf("CompilerBackend: %s\n", Config.CompilerBackend);
-        printf("CompilerArguments: %s\n", Config.CompilerArguments);
-        printf("LinkerArguments: %s\n", Config.LinkerArguments);
     }
 
     char DynamicCodePath[2048];
@@ -131,20 +163,28 @@ main(int argc, char **args)
     if (Size)
     {
         unsigned int FileNameSize = StringLength(Config.DynamicCodeFileName);
-        char Buffer[Size + FileNameSize + 1];
-        snprintf(Buffer, sizeof(Buffer), "%s\\%s", DynamicCodePath, Config.DynamicCodeFileName);
-
+        char *Buffer = static_cast<char *>(malloc(Size + FileNameSize));
+        strcpy(Buffer, DynamicCodePath);
+        strcat(Buffer, "\\");
+        strcat(Buffer, Config.DynamicCodeFileName);
         Build(Buffer);
+        free(Buffer);
     }
 
     NSBuildDynamicCode DynamicCode = NSBuildDynamicCodeLoad("nsb.dll");
     if (DynamicCode.InitCallback)
     {
-        printf("Callback found, running code!\n");
+        Log("Running init callback ...");
         DynamicCode.InitCallback();
     }
     
-    PerformBuildStep();
+    PerformBuildStep(&Config);
+
+    if (DynamicCode.CleanUpCallback)
+    {
+        Log("Running cleanup callback ...\n");
+        DynamicCode.CleanUpCallback();
+    }
 
     NSBuildConfigUnload(&Config);
     

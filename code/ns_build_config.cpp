@@ -36,8 +36,15 @@ NSBuildParseConfig(char *FileContents, NSBuildConfig *Config)
 
             char *Value = KeyEnd + 1;
             unsigned int StringSize = StringLength(Value);
-            char *ValueCopy = (char *)malloc(StringSize + 1);
+            char *ValueCopy = static_cast<char *>(malloc(StringSize));
             strcpy(ValueCopy, Value);
+
+            // NOTE(Oskar): Remove carraige return from string if exist.
+            char *CarriageReturn = strchr(ValueCopy, '\r');
+            if (CarriageReturn != NULL)
+            {
+                *CarriageReturn = '\0';
+            }
 
             if (StringsAreEqual(Key, "DYNAMICCODEFILENAME"))
             {
@@ -90,7 +97,7 @@ NSBuildConfigLoad(char *ConfigPath)
         unsigned int FileSize = ftell(File);
         fseek(File, 0, SEEK_SET);
 
-        FileContents = (char *)malloc(FileSize+1);
+        FileContents = static_cast<char *>(malloc(FileSize+1));
         if(FileContents)
         {
             fread(FileContents, 1, FileSize, File);

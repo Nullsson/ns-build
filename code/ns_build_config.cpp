@@ -8,11 +8,18 @@
 
 struct NSBuildConfig
 {
-    char *DynamicCodeFileName;
+    char *DynamicCodeEntryFileName;
+    char *DynamicCodeOutputFileName;
+    char *DynamicCodeCompilerBackend;
+    char *DynamicCodeCompilerFlags;
+    char *DynamicCodeLinkerFlags;
     char *EntryFileName;
+    char *OutputFileName;
     char *CompilerBackend;
-    char *CompilerArguments;
-    char *LinkerArguments;
+    char *CompilerFlags;
+    char *LinkerFlags;
+    char *BuildOutputDirectory;
+    bool HasBuildDirectory;
 };
 
 static void
@@ -46,25 +53,53 @@ NSBuildParseConfig(char *FileContents, NSBuildConfig *Config)
                 *CarriageReturn = '\0';
             }
 
-            if (StringsAreEqual(Key, "DYNAMICCODEFILENAME"))
+            if (StringsAreEqual(Key, "DYNAMICCODEENTRYFILENAME"))
             {
-                Config->DynamicCodeFileName = ValueCopy;
+                Config->DynamicCodeEntryFileName = ValueCopy;
+            }
+            else if (StringsAreEqual(Key, "DYNAMICCODEOUTPUTFILENAME"))
+            {
+                Config->DynamicCodeOutputFileName = ValueCopy;
+            }
+            else if (StringsAreEqual(Key, "DYNAMICCODECOMPILERBACKEND"))
+            {
+                Config->DynamicCodeCompilerBackend = ValueCopy;
+            }
+            else if (StringsAreEqual(Key, "DYNAMICCODECOMPILERFLAGS"))
+            {
+                Config->DynamicCodeCompilerFlags = ValueCopy;
+            }
+            else if (StringsAreEqual(Key, "DYNAMICCODELINKERFLAGS"))
+            {
+                Config->DynamicCodeLinkerFlags = ValueCopy;
             }
             else if (StringsAreEqual(Key, "ENTRYFILENAME"))
             {
                 Config->EntryFileName = ValueCopy;
             }
+            else if (StringsAreEqual(Key, "OUTPUTFILENAME"))
+            {
+                Config->OutputFileName = ValueCopy;
+            }
             else if (StringsAreEqual(Key, "COMPILERBACKEND"))
             {
                 Config->CompilerBackend = ValueCopy;
             }
-            else if (StringsAreEqual(Key, "COMPILERARGUMENTS"))
+            else if (StringsAreEqual(Key, "COMPILERFLAGS"))
             {
-                Config->CompilerArguments = ValueCopy;
+                Config->CompilerFlags = ValueCopy;
             }
-            else if (StringsAreEqual(Key, "LINKERARGUMENTS"))
+            else if (StringsAreEqual(Key, "LINKERFLAGS"))
             {
-                Config->LinkerArguments = ValueCopy;
+                Config->LinkerFlags = ValueCopy;
+            }
+            else if (StringsAreEqual(Key, "BUILDOUTPUTDIRECTORY"))
+            {
+                Config->BuildOutputDirectory = ValueCopy;
+                if (StringLength(Config->BuildOutputDirectory) > 0)
+                {
+                    Config->HasBuildDirectory = true;
+                }
             }
             else
             {
@@ -88,6 +123,7 @@ static NSBuildConfig
 NSBuildConfigLoad(char *ConfigPath)
 {
     NSBuildConfig Config = {0};
+    Config.HasBuildDirectory = false;
 
     char *FileContents = 0;
     FILE *File = fopen(ConfigPath, "rb");
@@ -116,18 +152,36 @@ NSBuildConfigLoad(char *ConfigPath)
 static void
 NSBuildConfigUnload(NSBuildConfig *Config)
 {
-    free(Config->DynamicCodeFileName);
-    Config->DynamicCodeFileName = 0;
-        
+    free(Config->DynamicCodeEntryFileName);
+    Config->DynamicCodeEntryFileName = 0;
+
+    free(Config->DynamicCodeOutputFileName);
+    Config->DynamicCodeOutputFileName = 0;
+
+    free(Config->DynamicCodeCompilerBackend);
+    Config->DynamicCodeCompilerBackend = 0;
+
+    free(Config->DynamicCodeCompilerFlags);
+    Config->DynamicCodeCompilerFlags = 0;
+
+    free(Config->DynamicCodeLinkerFlags);
+    Config->DynamicCodeLinkerFlags = 0;
+    
     free(Config->EntryFileName);
     Config->EntryFileName = 0;
+
+    free(Config->OutputFileName);
+    Config->OutputFileName = 0;
     
     free(Config->CompilerBackend);
     Config->CompilerBackend = 0;
     
-    free(Config->CompilerArguments);
-    Config->CompilerArguments = 0;
+    free(Config->CompilerFlags);
+    Config->CompilerFlags = 0;
     
-    free(Config->LinkerArguments);
-    Config->LinkerArguments = 0;
+    free(Config->LinkerFlags);
+    Config->LinkerFlags = 0;
+
+    free(Config->BuildOutputDirectory);
+    Config->BuildOutputDirectory = 0;
 }

@@ -25,8 +25,23 @@
 #include "ns_build_config.cpp"
 #include "ns_build_dynamic.cpp"
 
+void CreateFolderIfNotExist(char *Path)
+{
+#if BUILD_WIN32
+    if (CreateDirectory(Path, NULL) || ERROR_ALREADY_EXISTS == GetLastError())
+    {
+        // NOTE(Oskar): Successfully created directory or it already exists.
+    }
+    else
+    {
+        LogError("Failed to create directory at: %s", Path);
+    }
+#elif BUILD_LINUX
+#endif
+}
+
 void
-Build(char *CodePath)
+Build(NSBuildConfig *Config, char *CodePath)
 {
 #if BUILD_WIN32
     STARTUPINFO Info;
@@ -37,13 +52,24 @@ Build(char *CodePath)
     ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
 
     // TODO(Oskar): Allow for custom build and link flags in config for the dynamic code.
-    char BuildCommand[2048] = "clang-cl -D_CRT_SECURE_NO_DEPRECATE -nologo /Zi";
-    strcat(BuildCommand, " ");
-    strcat(BuildCommand, CodePath);
-    strcat(BuildCommand, " ");
-    strcat(BuildCommand, "/LD /link /out:nsb.dll");
-
+    char BuildCommand[2048];
+    snprintf(BuildCommand, sizeof(BuildCommand), "%s %s %s %s /out:%s.dll",
+             Config->DynamicCodeCompilerBackend,
+             Config->DynamicCodeCompilerFlags,
+             Config->DynamicCodeEntryFileName,
+             Config->DynamicCodeLinkerFlags,
+             Config->DynamicCodeOutputFileName);
+    
     Log("Building DynamicCode with arguments: %s", BuildCommand);
+
+    char BuildPath[2048] = {0};
+    if (Config->HasBuildDirectory)
+    {
+        DWORD Size = GetCurrentDirectory(2048, BuildPath);
+        strcat(BuildPath, "\\");
+        strcat(BuildPath, Config->BuildOutputDirectory);
+        Log("Build Path: %s", BuildPath);
+    }
     
     if (CreateProcess(NULL,                    // Application name, null so we will use command line.
                       BuildCommand,            // Command line to be executed.
@@ -52,13 +78,20 @@ Build(char *CodePath)
                       FALSE,                   // Set handle inheritance to false making it not inherited.
                       0,                       // Creation flags, controls the priority class etc.
                       NULL,                    // Pointer to environment block, use parent's environment block.
-                      NULL,                    // Full path to the current directory of the process, use parent's starting directory.
+                      Config->HasBuildDirectory ? BuildPath : NULL, // Full path to the current directory of the process, use parent's starting directory.
                       &Info,                   // Pointer to STARTUPINFO structure.
                       &ProcessInformation))    // Pointer to PROCESS_INFORMATION structure.
     {
         // TODO(Oskar): Maybe don't wait infinite time?
         WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
-
+        
+        DWORD ExitCode;
+        GetExitCodeProcess(ProcessInformation.hProcess, &ExitCode);
+        if (ExitCode > 0)
+        {
+            LogError("ERROR: Failed to compile.");
+        }
+        
         // NOTE(Oskar): Close the process when its done.
         CloseHandle(ProcessInformation.hProcess);
         CloseHandle(ProcessInformation.hThread);
@@ -70,15 +103,69 @@ Build(char *CodePath)
 #endif
 }
 
-// TODO(Oskar): Implement!
-void PerformBuildStep()
+void PerformBuildStep(NSBuildConfig *Config)
 {
+#if BUILD_WIN32
+    STARTUPINFO Info;
+    PROCESS_INFORMATION ProcessInformation;
+
+    ZeroMemory(&Info, sizeof(Info));
+    Info.cb = sizeof(Info);
+    ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
+
+    char BuildCommand[2048];
+    snprintf(BuildCommand, sizeof(BuildCommand), "%s %s %s %s /out:%s.exe",
+             Config->CompilerBackend,
+             Config->CompilerFlags,
+             Config->EntryFileName,
+             Config->LinkerFlags,
+             Config->OutputFileName);
+
+    Log("Building project with arguments: %s", BuildCommand);
+
+    char BuildPath[2048] = {0};
+    if (Config->HasBuildDirectory)
+    {
+        DWORD Size = GetCurrentDirectory(2048, BuildPath);
+        strcat(BuildPath, "\\");
+        strcat(BuildPath, Config->BuildOutputDirectory);
+        Log("Build Path: %s", BuildPath);
+    }
     
+    if (CreateProcess(NULL,                    // Application name, null so we will use command line.
+                      BuildCommand,            // Command line to be executed.
+                      NULL,                    // Process handle cannot be inherited.
+                      NULL,                    // Thread handle cannot be inherited.
+                      FALSE,                   // Set handle inheritance to false making it not inherited.
+                      0,                       // Creation flags, controls the priority class etc.
+                      NULL,                    // Pointer to environment block, use parent's environment block.
+                      Config->HasBuildDirectory ? BuildPath : NULL, // Full path to the current directory of the process, use parent's starting directory.
+                      &Info,                   // Pointer to STARTUPINFO structure.
+                      &ProcessInformation))    // Pointer to PROCESS_INFORMATION structure.
+    {
+        // TODO(Oskar): Maybe don't wait infinite time?
+        WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
+
+        DWORD ExitCode;
+        GetExitCodeProcess(ProcessInformation.hProcess, &ExitCode);
+        if (ExitCode > 0)
+        {
+            LogError("ERROR: Failed to compile.");
+        }        
+        
+        // NOTE(Oskar): Close the process when its done.
+        CloseHandle(ProcessInformation.hProcess);
+        CloseHandle(ProcessInformation.hThread);
+    }
+
+    Log("Successfully built application.");
+#elif BUILD_LINUX
+#endif
 }
 
 int
 main(int argc, char **args)
-{
+{    
     if (argc > 1)
     {
         if (StringsAreEqual(args[1], "help") ||
@@ -109,42 +196,78 @@ main(int argc, char **args)
         }
     }
 
+    // NOTE(Oskar): Finding, loading and parsing configuration.
     NSBuildConfig Config = {0};
     {
-        char CurrentDirectory[MAX_PATH];
-        DWORD PathSize = GetCurrentDirectory(MAX_PATH, CurrentDirectory);
+#if BUILD_WIN32
+        WIN32_FIND_DATA FindFileData;
+        HANDLE FileHandle;
+        FileHandle = FindFirstFileA("*.nsbconf", &FindFileData);
 
-        // TODO(Oskar): Dynamically find nsbconf file.
-        strcat(CurrentDirectory, "/buildconfig.nsbconf");
-        
-        Config = NSBuildConfigLoad(CurrentDirectory);
-        Log("NS Build config found and loaded.");
-        printf("DynamicCodeFileName: %s\n", Config.DynamicCodeFileName);
-        printf("EntryFileName: %s\n", Config.EntryFileName);
-        printf("CompilerBackend: %s\n", Config.CompilerBackend);
-        printf("CompilerArguments: %s\n", Config.CompilerArguments);
-        printf("LinkerArguments: %s\n", Config.LinkerArguments);
+        if (FileHandle == INVALID_HANDLE_VALUE)
+        {
+            LogError("ERROR: Failed for find .nsbconf file.");
+        }
+        else
+        {
+            Log("Loading NSBuild config file: %s", FindFileData.cFileName);
+            Config = NSBuildConfigLoad(FindFileData.cFileName);
+            Log("NSBuild config successfully loaded.");
+        }
+#elif BUILD_LINUX
+#endif
     }
 
+    // NOTE(Oskar): Create the build directory if it already doesn't exist.
+    if (Config.HasBuildDirectory)
+    {
+        char CurrentPath[MAX_PATH];
+        DWORD Size = GetCurrentDirectory(MAX_PATH, CurrentPath);
+        strcat(CurrentPath, "\\");
+        strcat(CurrentPath, Config.BuildOutputDirectory);
+        CreateFolderIfNotExist(CurrentPath);
+    }
+    
     char DynamicCodePath[2048];
     DWORD Size = GetCurrentDirectory(2048, DynamicCodePath);
     if (Size)
     {
-        unsigned int FileNameSize = StringLength(Config.DynamicCodeFileName);
-        char Buffer[Size + FileNameSize + 1];
-        snprintf(Buffer, sizeof(Buffer), "%s\\%s", DynamicCodePath, Config.DynamicCodeFileName);
-
-        Build(Buffer);
+        unsigned int FileNameSize = StringLength(Config.DynamicCodeEntryFileName);
+        char *Buffer = static_cast<char *>(malloc(Size + FileNameSize));
+        strcpy(Buffer, DynamicCodePath);
+        strcat(Buffer, "\\");
+        strcat(Buffer, Config.DynamicCodeEntryFileName);
+        Build(&Config, Buffer);
+        free(Buffer);
     }
 
-    NSBuildDynamicCode DynamicCode = NSBuildDynamicCodeLoad("nsb.dll");
+    char DynamicCodeDLLPath[2048];
+    if (Config.HasBuildDirectory)
+    {
+        snprintf(DynamicCodeDLLPath, sizeof(DynamicCodeDLLPath), "%s/%s.dll",
+                 Config.BuildOutputDirectory,
+                 Config.DynamicCodeOutputFileName);
+    }
+    else
+    {
+        snprintf(DynamicCodeDLLPath, sizeof(DynamicCodeDLLPath), "%s.dll",
+                 Config.DynamicCodeOutputFileName);
+    }
+    
+    NSBuildDynamicCode DynamicCode = NSBuildDynamicCodeLoad(DynamicCodeDLLPath);
     if (DynamicCode.InitCallback)
     {
-        printf("Callback found, running code!\n");
+        Log("Running init callback ...");
         DynamicCode.InitCallback();
     }
     
-    PerformBuildStep();
+    PerformBuildStep(&Config);
+
+    if (DynamicCode.CleanUpCallback)
+    {
+        Log("Running cleanup callback ...");
+        DynamicCode.CleanUpCallback();
+    }
 
     NSBuildConfigUnload(&Config);
     

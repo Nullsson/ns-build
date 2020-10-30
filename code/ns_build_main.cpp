@@ -84,7 +84,14 @@ Build(NSBuildConfig *Config, char *CodePath)
     {
         // TODO(Oskar): Maybe don't wait infinite time?
         WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
-
+        
+        DWORD ExitCode;
+        GetExitCodeProcess(ProcessInformation.hProcess, &ExitCode);
+        if (ExitCode > 0)
+        {
+            LogError("ERROR: Failed to compile.");
+        }
+        
         // NOTE(Oskar): Close the process when its done.
         CloseHandle(ProcessInformation.hProcess);
         CloseHandle(ProcessInformation.hThread);
@@ -139,6 +146,13 @@ void PerformBuildStep(NSBuildConfig *Config)
         // TODO(Oskar): Maybe don't wait infinite time?
         WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
 
+        DWORD ExitCode;
+        GetExitCodeProcess(ProcessInformation.hProcess, &ExitCode);
+        if (ExitCode > 0)
+        {
+            LogError("ERROR: Failed to compile.");
+        }        
+        
         // NOTE(Oskar): Close the process when its done.
         CloseHandle(ProcessInformation.hProcess);
         CloseHandle(ProcessInformation.hThread);
@@ -251,7 +265,7 @@ main(int argc, char **args)
 
     if (DynamicCode.CleanUpCallback)
     {
-        Log("Running cleanup callback ...\n");
+        Log("Running cleanup callback ...");
         DynamicCode.CleanUpCallback();
     }
 

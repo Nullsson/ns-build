@@ -182,16 +182,26 @@ main(int argc, char **args)
         }
     }
 
+    // NOTE(Oskar): Finding, loading and parsing configuration.
     NSBuildConfig Config = {0};
     {
-        char CurrentDirectory[MAX_PATH];
-        DWORD PathSize = GetCurrentDirectory(MAX_PATH, CurrentDirectory);
+#if BUILD_WIN32
+        WIN32_FIND_DATA FindFileData;
+        HANDLE FileHandle;
+        FileHandle = FindFirstFileA("*.nsbconf", &FindFileData);
 
-        // TODO(Oskar): Dynamically find nsbconf file.
-        strcat(CurrentDirectory, "/buildconfig.nsbconf");
-        
-        Config = NSBuildConfigLoad(CurrentDirectory);
-        Log("NS Build config found and loaded.");
+        if (FileHandle == INVALID_HANDLE_VALUE)
+        {
+            LogError("ERROR: Failed for find .nsbconf file.");
+        }
+        else
+        {
+            Log("Loading NSBuild config file: %s", FindFileData.cFileName);
+            Config = NSBuildConfigLoad(FindFileData.cFileName);
+            Log("NSBuild config successfully loaded.");
+        }
+#elif BUILD_LINUX
+#endif
     }
 
     // NOTE(Oskar): Create the build directory if it already doesn't exist.
